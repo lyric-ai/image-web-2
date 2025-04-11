@@ -1,117 +1,69 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Liblib AI Text to Image</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background-color: #f0f0f0;
-    }
-    #container {
-      max-width: 800px;
-      margin: 0 auto;
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    button {
-      padding: 10px 20px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    #image-container {
-      margin-top: 20px;
-      text-align: center;
-    }
-    img {
-      max-width: 100%;
-      border-radius: 8px;
-    }
-    #error-message {
-      color: red;
-      font-size: 16px;
-      display: none;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Liblib AI Text-to-Image</title>
 </head>
 <body>
-
-  <div id="container">
-    <h2>Generate Image from Text</h2>
-    <input type="text" id="textInput" placeholder="Enter description of the image">
-    <button onclick="generateImage()">Generate Image</button>
-    <div id="error-message"></div>
-    <div id="image-container"></div>
-  </div>
+  <h1>Liblib AI 文生图</h1>
+  <input type="text" id="promptInput" placeholder="输入你的提示词..." />
+  <button onclick="generateImage()">生成图片</button>
+  <div id="imageContainer"></div>
 
   <script>
     async function generateImage() {
-      const text = document.getElementById('textInput').value;
-      const errorMessage = document.getElementById('error-message');
-      const imageContainer = document.getElementById('image-container');
+      const text = document.getElementById("promptInput").value;
+      const timestamp = Date.now();
+      const nonce = Math.random().toString(36).substring(2, 15);
 
-      if (!text) {
-        errorMessage.style.display = 'block';
-        errorMessage.textContent = 'Please enter a description.';
-        return;
-      }
+      const accessKey = "NRXABtFaq2nlj-fRV4685Q";
+      const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"; // 注意：不要在生产环境暴露密钥
 
-      errorMessage.style.display = 'none';
-      imageContainer.innerHTML = '<p>Generating image...</p>';
-
-      const requestBody = {
+      const payload = {
         templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
         generateParams: {
           "65": {
             class_type: "CLIPTextEncode",
-            inputs: {
-              text: text
-            }
+            inputs: { text: text }
           },
           workflowUuid: "dee7984fcace4d40aa8bc99ff6a4dc36"
         }
       };
 
+      const signature = ""; // 实际部署请在后端生成签名
+
       try {
-        const response = await fetch('https://openapi.liblibai.cloud/api/generate/comfyui/app?AccessKey=NRXABtFaq2nlj-fRV4685Q&Signature=UvQB5sh4936_ikmLpqI37aGBqVM&Timestamp=1744301372151&SignatureNonce=eop1050f3gh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody)
+        const response = await fetch(`https://your-vercel-proxy.vercel.app/api/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
         });
 
         const data = await response.json();
+        const uuid = data.data.generateUuid;
 
-        if (data.code === 0 && data.data && data.data.images) {
-          const imageUrl = data.data.images[0].imageUrl;
-          imageContainer.innerHTML = `<img src="${imageUrl}" alt="Generated Image">`;
-        } else {
-          imageContainer.innerHTML = '<p>Image generation failed.</p>';
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        imageContainer.innerHTML = '<p>Something went wrong. Please try again later.</p>';
+        const poll = async () => {
+          const statusRes = await fetch(`https://your-vercel-proxy.vercel.app/api/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ generateUuid: uuid })
+          });
+          const statusData = await statusRes.json();
+          if (statusData.data.generateStatus === 5) {
+            const imageUrl = statusData.data.images[0].imageUrl;
+            document.getElementById("imageContainer").innerHTML = `<img src="${imageUrl}" width="512"/>`;
+          } else {
+            setTimeout(poll, 1000);
+          }
+        };
+
+        poll();
+      } catch (err) {
+        console.error("生成失败:", err);
       }
     }
   </script>
-
 </body>
 </html>
