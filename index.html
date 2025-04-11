@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Liblib AI Image Generator</title>
+</head>
+<body>
+    <h1>Liblib AI 文生图</h1>
+    <input type="text" id="promptInput" placeholder="请输入提示词" />
+    <button onclick="generateImage()">生成图片</button>
+    <p id="statusText"></p>
+    <img id="resultImage" style="max-width: 500px; display: none;" />
+    <script src="./utils/signature.js"></script>
+    <script>
+        async function generateImage() {
+            const prompt = document.getElementById('promptInput').value;
+            const { AccessKey, Signature, Timestamp, SignatureNonce } = generateSignature();
+            const res = await fetch(`https://openapi.liblibai.cloud/api/generate/comfyui/app?AccessKey=${AccessKey}&Signature=${Signature}&Timestamp=${Timestamp}&SignatureNonce=${SignatureNonce}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
+                    generateParams: {
+                        "65": {
+                            class_type: "CLIPTextEncode",
+                            inputs: { text: prompt }
+                        },
+                        workflowUuid: "dee7984fcace4d40aa8bc99ff6a4dc36"
+                    }
+                })
+            });
+
+            const result = await res.json();
+            if (result.code === 0) {
+                const uuid = result.data.generateUuid;
+                document.getElementById("statusText").innerText = "生成中...";
+                const poll = setInterval(async () => {
+                    const statusRes = await fetch("https://openapi.liblibai.cloud/api/generate/comfy/status", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ generateUuid: uuid })
+                    });
+                    const status = await statusRes.json();
+                    if (status.data.generateStatus === 5) {
+                        clearInterval(poll);
+                        document.getElementById("statusText").innerText = "生成完成！";
+                        const img = document.getElementById("resultImage");
+                        img.src = status.data.images[0].imageUrl;
+                        img.style.display = "block";
+                    }
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>
